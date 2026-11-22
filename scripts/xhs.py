@@ -601,6 +601,21 @@ def ensure_host_ports_free(services: list[str]) -> None:
             raise SystemExit(1)
 
 
+def ensure_runtime_dirs() -> None:
+    """xhs 容器以 uid 10002 运行。宿主机 data/xhs 属于登录用户时，容器打不开 sqlite。"""
+    data = ROOT / "data" / "xhs"
+    data.mkdir(parents=True, exist_ok=True)
+    (data / "settings").mkdir(parents=True, exist_ok=True)
+    if os.name == "nt":
+        return
+    log("==> 放开 data/xhs 写权限，供容器用户写入数据库")
+    code = subprocess.call(["chmod", "-R", "a+rwX", str(data)])
+    if code != 0:
+        code = subprocess.call(["sudo", "chmod", "-R", "a+rwX", str(data)])
+    if code != 0:
+        raise SystemExit("无法放开 %s 的写权限，容器里会无法创建数据库。" % data)
+
+
 def stop_stack(services: list[str]) -> None:
     run(compose_cmd() + ["stop", *services], check=False)
 
@@ -628,6 +643,7 @@ def start_services(services: list[str], *, kill_host_ports: bool = True) -> None
     if not docker_info_ok():
         log("Docker 引擎未响应，正在等待恢复…")
         ensure_docker_desktop()
+    ensure_runtime_dirs()
     log("==> start: %s" % ", ".join(services))
     start_stack(services)
     ok, failed = wait_services_ready(services, timeout_sec=150)
