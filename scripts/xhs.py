@@ -576,10 +576,52 @@ def free_host_port(port: int) -> tuple[list[int], list[int]]:
     return killed, skipped
 
 
+def listening_lines(port: int) -> list[str]:
+    if os.name == "nt":
+        return []
+    try:
+        out = subprocess.check_output(["sudo", "ss", "-ltnp"], text=True, errors="replace")
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    needle = ":%s" % port
+    return [line.strip() for line in out.splitlines() if needle in line and "LISTEN" in line.upper()]
+
+
+def release_host_port(port: int) -> None:
+    """普通用户的 ss 看不到 docker-proxy。用 sudo 查，并结束仍占着本服务端口的进程。"""
+    lines = listening_lines(port)
+    if not lines:
+        return
+    log("==> 释放端口 %s" % port)
+    for line in lines:
+        log("  " + line)
+    subprocess.call(
+        ["sudo", "fuser", "-k", "%s/tcp" % port],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    for line in lines:
+        for token in line.replace(",", " ").replace(")", " ").split():
+            if not token.startswith("pid="):
+                continue
+            pid = token[4:]
+            if pid.isdigit():
+                subprocess.call(["sudo", "kill", "-9", pid], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(0.4)
+
+
 def ensure_host_ports_free(services: list[str]) -> None:
     ports = host_ports_for_services(services)
+    for port in ports:
+        release_host_port(port)
     wait_ports_clear(ports)
     for port in ports:
+        still = listening_lines(port)
+        if still:
+            log("  端口 %s 仍被占用。" % port)
+            for line in still:
+                log("  " + line)
+            raise SystemExit(1)
         pids = pids_listening_on(port)
         if not pids:
             continue
@@ -609,9 +651,7 @@ def ensure_runtime_dirs() -> None:
     if os.name == "nt":
         return
     log("==> 放开 data/xhs 写权限，供容器用户写入数据库")
-    code = subprocess.call(["chmod", "-R", "a+rwX", str(data)])
-    if code != 0:
-        code = subprocess.call(["sudo", "chmod", "-R", "a+rwX", str(data)])
+    code = subprocess.call(["sudo", "chmod", "-R", "a+rwX", str(data)])
     if code != 0:
         raise SystemExit("无法放开 %s 的写权限，容器里会无法创建数据库。" % data)
 
