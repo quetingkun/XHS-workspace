@@ -1,0 +1,6 @@
+kind: output
+name: rca-report-v1
+version: 1.0.0
+format: json_schema
+strict: true
+schema_file: rca-report-v1.schema.json

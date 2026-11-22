@@ -1,0 +1,12 @@
+# 腾讯云 / 公网：与 deploy/docker-compose.yml 叠加使用
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.prod.yml up -d
+# 或：XHS_DEPLOY_PROD=1 python scripts/xhs.py start
+
+services:
+  xhs:
+    ports:
+      - "80:8097"
+
+  agent-core:
+    ports:
+      - "127.0.0.1:${XHS_AGENT_CORE_HOST_PORT:-8082}:8081"

@@ -1,0 +1,108 @@
+agent_id: root_cause_analysis_agent
+name: 智能根因定位智能体
+owned_function: root_cause_analysis
+version: 1.0.0
+enabled: true
+
+extends:
+  memory: session_only@1.0.0
+
+instructions:
+  system: |
+    你是「IT 系统智能根因定位与故障分析专家」。
+    职责：融合逻辑推理与全链路监控数据，结合拓扑、Trace、指标、日志、变更事件、知识库与历史案例，
+    跨层级进行因果推断，输出根因假设、证据链、置信度与处置建议。
+    输出在「根因智能定位」页面：故障时间线、推理过程、证据链可视化、处置建议。
+  developer: |
+    【模式 · 由 user prompt 判定】
+
+    **采集 turn**（user prompt 含 `alert_context` 且 `collection_mode=agent_driven`）：
+    - 按已预加载的 rca-metrics-collection / discovery-workflow 执行采集；完成后只回一行 `COLLECTION_DONE`；禁止输出 RcaReport。
+
+    **报告 / repair turn**（user prompt 含 EvidenceBundle / `agent_view` 或 repair 指令）：
+    - 遵循已预加载的 log-rca（含 analysis-rules / rca-report-v1）。
+    - **禁止调用任何工具**（含 MCP）；仅输出合法 RcaReport v1 JSON（禁止 Markdown、代码块、解释文字）。
+    - `evidence_id` 只能取自 bundle / `allowed_evidence_ids`；禁止编造。
+
+model:
+  inherit_default_model: true
+  temperature: 0.1
+  max_tokens: 16384
+  reasoning_effort: low
+  # DeepSeek: thinking.type；仅当运行时模型名含 qwen 时，openaichat
+  # 才会额外下发 enable_thinking / chat_template_kwargs（inherit_default_model
+  # 切到 Qwen 即可生效，切回 DeepSeek 不会误注入）。
+  thinking:
+    type: disabled
+
+output:
+  type: structured
+  schema: rca-report-v1@1.0.0
+  turn_kinds:
+    - analysis
+    - repair
+  fallback_to_text: false
+
+skills:
+  - log-rca
+  - rca-metrics-collection
+
+tools:
+  allow:
+    # skill_view 不再需要：采集/报告 skill 由 binding preload（含 references）
+    # Baseline MCP（暂时关闭，待 Grafana 调通后恢复）
+    # - mcp__rca_baseline__catalog
+    # - mcp__rca_baseline__query_alert_window
+    # - mcp__rca_baseline__resolve_instance
+    # - mcp__rca_baseline__get_scheduled_baseline
+    - mcp__rca_grafana__list_panels
+    - mcp__rca_grafana__query_panel
+    # Metrics MCP（暂时关闭，待 Grafana 调通后恢复）
+    # - mcp__rca_metrics__query_instant
+    # - mcp__rca_metrics__query_range
+    # - mcp__rca_metrics__suggest_queries
+    - mcp__rca_elasticsearch__search_logs
+    - mcp__rca_elasticsearch__cluster_errors
+    - mcp__rca_skywalking__slow_traces
+    - mcp__rca_skywalking__db_sql
+    - mcp__rca_npm__url_errors
+  deny:
+    - shell
+    - read_file
+    - list_files
+    - search_files
+    - apply_patch
+    - skill_manage
+    - echo
+    # Baseline / Metrics MCP 暂时禁用
+    - mcp__rca_baseline__catalog
+    - mcp__rca_baseline__query_alert_window
+    - mcp__rca_baseline__resolve_instance
+    - mcp__rca_baseline__get_scheduled_baseline
+    - mcp__rca_metrics__query_instant
+    - mcp__rca_metrics__query_range
+    - mcp__rca_metrics__query_by_layer
+    - mcp__rca_metrics__suggest_queries
+    # 运维对话 MCP（无 job_id）；RCA 须用 mcp__rca_*__*
+    - mcp__es_log__list_log_datasources
+    - mcp__es_log__test_log_datasource
+    - mcp__es_log__search_logs
+    - mcp__metrics__list_panels
+    - mcp__metrics__query_panel
+    - mcp__metrics__query_range
+    - mcp__alerts__alert_summary
+    - mcp__alerts__list_alerts
+    - mcp__skywalking__list_trace_datasources
+    - mcp__skywalking__list_slow_traces
+    - mcp__skywalking__get_trace
+    - mcp__baseline__list_catalog
+    - mcp__baseline__query_window
+    - mcp__baseline__get_scheduled
+
+handoff:
+  enabled: false
+  description: 处置完成后可将经验沉淀至知识库。
+  allowed_targets: []
+
+eval:
+  suite: root_cause_analysis_basic

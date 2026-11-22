@@ -1,0 +1,24 @@
+account:
+  name: ""
+  positioning: "待确定"
+  target_audience: []
+
+content:
+  enabled_categories: []
+  preferred_types:
+    - 教程
+    - 经验分享
+    - 工具测评
+    - 知识科普
+  avoid:
+    - 未经核实的热点
+    - 直接搬运他人内容
+    - 无实际价值的营销内容
+
+style:
+  tone: "自然、真实、有信息价值"
+  language: "简体中文"
+
+publishing:
+  mode: "manual_approval"
+  auto_publish: false

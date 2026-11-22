@@ -1,0 +1,31 @@
+collectors:
+  hot_daily:
+    enabled: true
+    auto_refresh: true
+    refresh_check_minutes: 60
+    default_category: 推荐
+    default_keyword: ""
+    command: ""
+    top_n: 15
+    timeout: 120
+    # Docker 无本机 Chrome，无头时会自动用 Playwright Chromium
+    browser_channel: chrome
+    user_data_dir: data/xhs/browser-profile
+    use_headed: false
+  daily_top:
+    enabled: false
+    command: ""
+    fallback:
+      - redfox
+      - custom_api
+      - playwright
+  media_crawler:
+    enabled: false
+    command: ""
+    max_notes: 15
+    max_comments_per_note: 10
+  xhs_downloader:
+    enabled: false
+    command: ""
+  agent_reach:
+    enabled: false

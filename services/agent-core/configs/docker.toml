@@ -1,0 +1,214 @@
+# 容器运行配置（配合 Dockerfile CMD 与环境变量）
+provider = "deepseek"
+model = "deepseek-chat"
+model_provider = "deepseek"
+max_tokens = 16384
+temperature = 0.1
+top_p = 0.9
+
+# --- 上下文窗口与自动压缩（模式 B：LLM 摘要）---
+# 模型上下文窗口（token）；与 DeepSeek 128K 对齐，用于上报 context_limit 与压缩回退阈值
+model_context_window = 128000
+# 估算 token 超过该值时触发自动压缩（建议约为窗口的 75%）
+model_auto_compact_token_limit = 96000
+# 剩余 token 低于该值时在 instructions 注入提醒，引导模型收尾（0=关闭）
+token_budget_reminder_threshold = 8000
+# 开启 LLM 摘要压缩；失败时自动降级为 tail 裁剪
+enable_summary_compaction = true
+# 摘要专用模型（留空则用主模型 model）
+compaction_summary_model = "deepseek-chat"
+# 摘要最大输出 token（0 或未设时运行默认 2000）
+compaction_summary_max_tokens = 2000
+
+include_permissions_instructions = false
+include_apps_instructions = false
+
+sandbox_mode = "read-only"
+approval_mode = "unless-trusted"
+
+# es_log search_logs 单响应可达 200 KiB
+tool_result_max_bytes = 204800
+
+[execution_paths]
+outputs_prefix = "outputs"
+documents_subdir = "chat-documents"
+scripts_subdir = "chat-scripts"
+scratch_subdir = "scratch"
+per_agent_outputs = true
+
+[sandbox_workspace_write]
+network_access = true
+
+[database]
+driver = "sqlite"
+
+[state]
+persistence = "enabled"
+flush_on_turn_end = true
+
+[history]
+persistence = "save-all"
+
+[mcp]
+enabled = true
+startup_timeout_ms = 10000
+# SkyWalking slow_traces 预算≈列表预留+TopN×单条，总上限默认 120s；本值须 ≥ 该上限（兜底）。
+tool_timeout_ms = 120000
+trusted_tools = [
+  "mcp__es_log__list_log_datasources",
+  "mcp__es_log__test_log_datasource",
+  "mcp__es_log__search_logs",
+  "mcp__metrics__list_panels",
+  "mcp__metrics__query_panel",
+  "mcp__metrics__query_range",
+  "mcp__knowledge__search",
+  "mcp__umodel__catalog_summary",
+  "mcp__umodel__list_datasets",
+  "mcp__umodel__query_metrics",
+  "mcp__umodel__query_logs",
+  "mcp__alerts__alert_summary",
+  "mcp__alerts__list_alerts",
+  "mcp__alerts__get_latest_alert",
+  "mcp__alerts__get_alert_rca",
+  "mcp__systems__resolve_business_system",
+  "mcp__systems__list_business_systems",
+  "mcp__skywalking__list_trace_datasources",
+  "mcp__skywalking__list_slow_traces",
+  "mcp__skywalking__get_trace",
+  "mcp__baseline__list_catalog",
+  "mcp__baseline__query_window",
+  "mcp__baseline__get_scheduled",
+  "mcp__rca_baseline__catalog",
+  "mcp__rca_baseline__query_alert_window",
+  "mcp__rca_baseline__resolve_instance",
+  "mcp__rca_baseline__get_scheduled_baseline",
+  "mcp__rca_grafana__list_panels",
+  "mcp__rca_grafana__query_panel",
+  "mcp__rca_metrics__query_instant",
+  "mcp__rca_metrics__query_range",
+  "mcp__rca_metrics__query_by_layer",
+  "mcp__rca_metrics__suggest_queries",
+  "mcp__rca_elasticsearch__search_logs",
+  "mcp__rca_elasticsearch__cluster_errors",
+  "mcp__rca_skywalking__slow_traces",
+  "mcp__rca_skywalking__db_sql",
+  "mcp__rca_npm__url_errors",
+]
+
+# 业务 [mcp_servers.*] 由 MCP 注册中心管理（若启用）。
+# go-agent-core 通过 GO_AGENT_PLATFORM_API_BASE 拉取 effective 并 SyncFromRegistry。
+# 本地联调 stdio 如需启用，请用预编译二进制，避免 `go run` 拖慢 L2 引导。
+
+[skills]
+enabled = true
+allow_read_scripts = true
+# 本进程只加载自身 skills；酷德审查走独立 agent-runtime，不进本进程
+paths = ["/app/skills"]
+
+# Phase 2：真正按绑定过滤；Store 未就绪仍 fail-open。
+[skills.binding]
+enabled = true
+shadow = false
+fail_open = true
+
+[skills.scripts]
+allow_outside_workspace = true
+
+stream = true
+
+[light_path]
+enabled = true
+model = "deepseek-v4-flash"
+max_tokens = 384
+max_history_turns = 2
+max_prompt_chars = 256
+agents = ["general_qa_agent"]
+skip_catalog_on_l2 = true
+
+[light_path.cache]
+enabled = true
+ttl_seconds = 3600
+max_entries = 512
+
+[light_path.embedding]
+enabled = true
+knowledge_url = "http://go-agent-knowledge:8092/api/knowledge/settings/embedding/internal"
+internal_secret_env = "GO_AGENT_PLATFORM_INTERNAL_SECRET"
+similarity_threshold = 0.72
+
+[knowledge]
+enabled = true
+base_url = "http://go-agent-knowledge:8092"
+timeout_ms = 60000
+internal_secret_env = "GO_AGENT_PLATFORM_INTERNAL_SECRET"
+default_kb_ids = ["kb_default"]
+use_default_when_unselected = true
+default_top_k = 5
+search_mode = "hybrid"
+rerank = true
+graph_timeout_ms = 22000
+# retrieval_path 由 knowledge 策略决定；不要写进 search_knowledge LLM schema
+# retrieval_path = "native"
+
+[intent_router]
+enabled = true
+agents = ["general_qa_agent"]
+
+[intent_router.semantic]
+enabled = true
+timeout_ms = 1500
+
+[intent_router.llm]
+enabled = true
+timeout_ms = 1200
+confidence_threshold = 0.6
+context_turns = 3
+
+[intent_router.llm.cache]
+enabled = true
+ttl_seconds = 3600
+max_entries = 512
+
+[knowledge.retrieval_gate]
+enabled = true
+min_score = 0.5
+timeout_ms = 800
+top_k = 1
+
+# 容器内 Codex sidecar：二进制由镜像构建写入 /usr/local/bin/codex，
+# binary_sha256 在 Dockerfile 里替换为实际 digest。隔离与本机开发一致（同容器 UID，不开 mount ns）。
+[codex]
+enabled = true
+binary_path = "/usr/local/bin/codex"
+binary_sha256 = "BUILD_TIME_CODEX_SHA256"
+version = "rust-v0.150.1"
+home_root = "/var/lib/ai-workspace/codex-home"
+max_processes = 4
+max_threads_per_process = 1
+acquire_timeout = "15s"
+startup_timeout = "30s"
+request_timeout = "180s"
+
+[codex.isolation]
+workspace_mode = "0700"
+require_mount_namespace = false
+
+[codex.quota]
+max_processes_per_tenant = 2
+
+[codex.model]
+provider = "openai-compatible"
+model = "Qwen3.6-35B-A3B-4bit"
+base_url = "http://host.docker.internal:8001/v1"
+env_key = "AIW_CODEX_MODEL_KEY"
+wire_api = "responses"
+
+[codex.routing]
+default_engine = "codex"
+allow_write_turns = false
+allow_override = true
+
+[codex.approval]
+general_qa = "on-request"
+root_cause_analysis = "never"
+code_review = "never"

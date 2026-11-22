@@ -1,0 +1,95 @@
+# AI-workspace 本地 agent-core
+#
+# 启动:
+#   python scripts/aiw.py start              # 默认含 agent-core :8081
+#   python scripts/aiw.py start --agent-core # 单独启 agent-core
+#
+# Codex 环境变量（compose / 运维可注入）:
+#   AIW_CODEX_ENABLED=true
+#   AIW_CODEX_BINARY_PATH=...
+#   AIW_CODEX_DEFAULT_ENGINE=codex|agent-core
+#   AIW_CODEX_UPSTREAM_API=openai-chat-completions  # DashScope 等 Completions 上游
+#
+# 健康检查: http://127.0.0.1:8081/health
+# 对话入口: POST /v1/agent-turns （SSE）function_id=brainstorm
+
+provider = "openai"
+model = "qwen3.6-plus"
+model_provider = "openai"
+api = "openai-chat-completions"
+api_key_env = "OPENAI_API_KEY"
+max_tokens = 8192
+temperature = 0.3
+
+instructions = """
+你是 AI-workspace 个人知识助手，帮助用户整理 Wiki、素材与推演结论。
+优先使用中文。简单问答可直接回复；需要检索知识库时再调用工具。
+不要自称 ChatGPT、Claude 或其他产品名。
+"""
+
+include_permissions_instructions = false
+include_apps_instructions = false
+sandbox_mode = "read-only"
+approval_mode = "unless-trusted"
+
+[skills]
+paths = ["skills"]
+
+[database]
+driver = "sqlite"
+
+[state]
+persistence = "enabled"
+flush_on_turn_end = true
+
+[history]
+persistence = "save-all"
+
+[mcp]
+enabled = true
+startup_timeout_ms = 10000
+tool_timeout_ms = 60000
+trusted_tools = [
+  "mcp__knowledge__search",
+  "mcp__web_search__search",
+]
+
+[mcp_servers.knowledge]
+transport = "http"
+url = "http://127.0.0.1:8092/api/internal/mcp/knowledge"
+required = true
+
+[mcp_servers.web_search]
+transport = "http"
+url = "http://127.0.0.1:8081/api/internal/mcp/web_search"
+required = false
+
+[knowledge]
+enabled = true
+base_url = "http://127.0.0.1:8092"
+timeout_ms = 12000
+default_kb_ids = ["kb_default"]
+use_default_when_unselected = true
+default_top_k = 6
+search_mode = "hybrid"
+rerank = true
+
+[codex]
+# 有 Codex 二进制时默认：AIW_CODEX_ENABLED=true 且默认引擎=codex
+# 用户可在「设置 → 智能体引擎」切回 agent-core（写入 state overlay）
+enabled = false
+# binary_path 可由 AIW_CODEX_BINARY_PATH 覆盖
+home_root = "./data/codex-home"
+
+[codex.routing]
+# 文件内默认；注入 AIW_CODEX_DEFAULT_ENGINE=codex 后优先生效（无 overlay 时）
+default_engine = "codex"
+allow_override = true
+
+[codex.model]
+# Codex 0.150+ 禁止覆盖内置 provider 名 openai
+provider = "openai-compatible"
+wire_api = "responses"
+# Completions 上游（阿里云/本地网关）时由 adapter 桥接：
+upstream_api = "openai-chat-completions"
+env_key = "OPENAI_API_KEY"

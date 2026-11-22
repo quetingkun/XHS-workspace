@@ -1,0 +1,38 @@
+# Codex 隔离运行骨架：每安全域独立用户、仅挂载本域目录。
+# 二进制 digest 由镜像构建参数钉死；运行期 go-agent-core 再校验一次。
+services:
+  codex-domain-0:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      args:
+        CODEX_VERSION: ${CODEX_VERSION:-unspecified}
+        CODEX_SHA256: ${CODEX_SHA256:-}
+    user: "60000:60000"
+    read_only: true
+    tmpfs:
+      - /tmp/codex:uid=60000,gid=60000,mode=0700
+    volumes:
+      - type: bind
+        source: ${CODEX_HOME_0:-./.codex-runtime/domain-0/home}
+        target: /var/lib/ai-workspace/codex-home
+        bind:
+          create_host_path: true
+      - type: bind
+        source: ${WORKSPACE_0:-./.codex-runtime/domain-0/workspace}
+        target: /var/lib/ai-workspace/workspaces
+        bind:
+          create_host_path: true
+    environment:
+      CODEX_HOME: /var/lib/ai-workspace/codex-home
+      HOME: /var/lib/ai-workspace/codex-home
+      TMPDIR: /tmp/codex
+      LANG: C.UTF-8
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 2g
+    cpus: 1.0
+    command: ["sleep", "infinity"]

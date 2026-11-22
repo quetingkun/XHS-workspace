@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aiw.dev/contracts/code-review/review-report-v2.schema.json",
+  "title": "ReviewReport v2",
+  "description": "Structured code review report with first-class review dimensions.",
+  "type": "object",
+  "required": ["summary", "findings"],
+  "properties": {
+    "summary": { "type": "string", "minLength": 1 },
+    "architecture_impact": { "type": "string" },
+    "quality_score": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "auto_approve": { "type": "boolean" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "category", "defect_type", "dimension", "file", "title", "description"],
+        "properties": {
+          "severity": { "enum": ["critical", "major", "minor", "info"] },
+          "category": {
+            "enum": [
+              "correctness",
+              "security",
+              "performance",
+              "architecture",
+              "testing",
+              "maintainability",
+              "dependency",
+              "config",
+              "style"
+            ]
+          },
+          "defect_type": {
+            "enum": [
+              "hardcoded_secret", "sql_injection", "xss", "ssrf", "path_traversal", "weak_crypto",
+              "auth_bypass", "command_injection", "insecure_deserialization",
+              "nil_deref", "error_ignored", "race_condition", "resource_leak", "logic_error", "boundary_check",
+              "breaking_change", "layer_violation", "duplicate_logic", "tight_coupling",
+              "missing_test", "flaky_test", "no_regression",
+              "n_plus_one", "unbounded_allocation", "hot_path_blocking",
+              "known_cve", "outdated_dependency", "license_risk",
+              "naming", "dead_code", "formatting", "other"
+            ]
+          },
+          "dimension": {
+            "enum": [
+              "design",
+              "correctness",
+              "reliability",
+              "security",
+              "testing",
+              "performance",
+              "maintainability",
+              "contract",
+              "observability",
+              "ops_readiness",
+              "dependency",
+              "privacy_compliance"
+            ]
+          },
+          "rule_id": { "type": "string" },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "cwe_ids": { "type": "array", "items": { "type": "string", "pattern": "^CWE-[0-9]+$" } },
+          "cve_ids": { "type": "array", "items": { "type": "string" } },
+          "file": { "type": "string" },
+          "line": { "type": "integer", "minimum": 0 },
+          "title": { "type": "string" },
+          "description": { "type": "string" },
+          "related_files": { "type": "array", "items": { "type": "string" } },
+          "suggested_fix": { "type": "string" }
+        }
+      }
+    },
+    "test_plan": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": false
+}

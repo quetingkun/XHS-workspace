@@ -1,0 +1,43 @@
+# XHS-workspace 专用 agent-core（默认 :8081，function_id=xhs_ops）
+#
+# 启动: python services/agent-core/server.py --config configs/xhs.toml
+# 健康: GET http://127.0.0.1:8081/health
+
+provider = "openai"
+model = "qwen3.6-plus"
+model_provider = "openai-compatible"
+api_key_env = "OPENAI_API_KEY"
+temperature = 0.3
+
+instructions = """
+你是小红书运营台（XHS-workspace）的对话运行时。
+优先使用中文。区分知识库摘录、采集结果与模型判断；不编造热点与数据。
+"""
+
+sandbox_mode = "read-only"
+approval_mode = "unless-trusted"
+
+[skills]
+paths = ["../xhs/skills"]
+
+[knowledge]
+base_url = "http://127.0.0.1:8097"
+default_kb_ids = ["kb_xhs"]
+default_top_k = 4
+
+[mcp]
+trusted_tools = [
+  "mcp__knowledge__search",
+  "mcp__web_search__search",
+]
+
+[codex]
+enabled = false
+
+[codex.routing]
+default_engine = "agent-core"
+allow_override = true
+
+[codex.model]
+provider = "openai-compatible"
+env_key = "OPENAI_API_KEY"

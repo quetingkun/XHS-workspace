@@ -1,0 +1,92 @@
+# 离线 dist 用。镜像已 docker load，不要在服务器上 build。
+# 目录：dist/deploy/docker-compose.yml（由 scripts/pack_dist.py 复制到这里）
+
+name: xhs-workspace
+
+services:
+  xhs:
+    image: xhs-workspace-xhs:local
+    pull_policy: never
+    container_name: xhs-workspace-xhs
+    restart: unless-stopped
+    ports:
+      - "80:8097"
+    environment:
+      TZ: Asia/Shanghai
+      XHS_HOST: "0.0.0.0"
+      XHS_PORT: "8097"
+      XHS_DATA: /workspace/data/xhs
+      AGENT_CORE_URL: http://agent-core:8081
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      XHS_BROWSER_IGNORE_HTTPS_ERRORS: ${XHS_BROWSER_IGNORE_HTTPS_ERRORS:-1}
+      XHS_SKIP_STARTUP_COLLECT: ${XHS_SKIP_STARTUP_COLLECT:-1}
+      XHS_AUTH_USER: ${XHS_AUTH_USER:-admin}
+      XHS_AUTH_PASSWORD: ${XHS_AUTH_PASSWORD:-}
+    volumes:
+      - ../data/xhs:/workspace/data/xhs
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8097/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 20s
+
+  agent-core:
+    image: xhs-workspace-agent-core:local
+    pull_policy: never
+    container_name: xhs-workspace-agent-core
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "127.0.0.1:${XHS_AGENT_CORE_HOST_PORT:-8082}:8081"
+    environment:
+      TZ: Asia/Shanghai
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      AGENTX_MODEL: ${AGENTX_MODEL:-}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      WEB_SEARCH_MAX_RESULTS: ${WEB_SEARCH_MAX_RESULTS:-5}
+      AIW_CODEX_ENABLED: ${AIW_CODEX_ENABLED:-true}
+      AIW_CODEX_DEFAULT_ENGINE: ${AIW_CODEX_DEFAULT_ENGINE:-codex}
+      AIW_CODEX_BINARY_PATH: /usr/local/bin/codex
+      AIW_CODEX_BINARY_SHA256: ${AIW_CODEX_BINARY_SHA256:-abf1bb1643a79f73aa78ee627e111e02d4f8c98f25813a0cf6ce277709664386}
+      AIW_CODEX_HOME_ROOT: /var/lib/ai-workspace/codex-home
+      AIW_CODEX_UPSTREAM_API: openai-chat-completions
+    volumes:
+      - agent_core_state:/data/state
+      - ../data/xhs/settings:/settings:ro
+      - ../data/xhs:/workspace/data/xhs
+      - ../skills:/xhs-skills:ro
+      - ../configs/docker.xhs.toml:/app/configs/docker.xhs.toml:ro
+      - ../configs/agents:/app/configs/agents:ro
+      - ../configs/agent-routing.yaml:/app/configs/agent-routing.yaml:ro
+      - ../configs/agent-components:/app/configs/agent-components:ro
+    command:
+      [
+        "--addr",
+        ":8081",
+        "--workspace-root",
+        "/workspace",
+        "--state-root",
+        "/data/state",
+        "--config",
+        "/app/configs/docker.xhs.toml",
+        "--agent-config-root",
+        "/app/configs",
+        "--cors-origins",
+        "${XHS_CORS_ORIGINS:-http://43.156.160.62,http://127.0.0.1:8097,http://localhost:8097}",
+      ]
+    depends_on:
+      xhs:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  agent_core_state:

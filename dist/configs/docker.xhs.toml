@@ -1,0 +1,53 @@
+# XHS-workspace agent-core 容器配置（compose：xhs :8097 + agent-core :8081）
+
+provider = "openai"
+model = "qwen3.6-plus"
+model_provider = "openai-compatible"
+api_key_env = "OPENAI_API_KEY"
+temperature = 0.3
+
+instructions = """
+你是小红书运营台（XHS-workspace）的对话运行时。
+优先使用中文。区分知识库摘录、采集结果与模型判断。
+"""
+
+sandbox_mode = "read-only"
+approval_mode = "unless-trusted"
+
+[mcp]
+trusted_tools = [
+  "mcp__knowledge__search",
+  "mcp__web_search__search",
+]
+
+# 联网搜索（容器内回环）
+[mcp_servers.web_search]
+transport = "http"
+url = "http://127.0.0.1:8081/api/internal/mcp/web_search"
+required = false
+
+[knowledge]
+enabled = true
+base_url = "http://xhs:8097"
+default_kb_ids = ["kb_xhs"]
+default_top_k = 4
+
+[skills]
+paths = ["/xhs-skills"]
+
+[codex]
+enabled = true
+binary_path = "/usr/local/bin/codex"
+binary_sha256 = "abf1bb1643a79f73aa78ee627e111e02d4f8c98f25813a0cf6ce277709664386"
+version = "rust-v0.150.1"
+home_root = "/var/lib/ai-workspace/codex-home"
+
+[codex.routing]
+default_engine = "codex"
+allow_override = true
+
+[codex.model]
+provider = "openai-compatible"
+wire_api = "responses"
+upstream_api = "openai-chat-completions"
+env_key = "OPENAI_API_KEY"

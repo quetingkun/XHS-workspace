@@ -1,0 +1,4 @@
+# 小红书运营服务依赖
+yt-dlp>=2024.1.0
+duckduckgo-search>=6.0.0
+playwright>=1.49.0

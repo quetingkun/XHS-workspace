@@ -1,0 +1,33 @@
+# Skills 端到端验证专用配置（fake provider，无需 API key）
+provider = "fake"
+model = "fake-model"
+
+instructions = """
+你是 Go Agent。回答简洁，优先中文。
+当用户涉及日志根因时，先 skill_view 加载对应 skill，再执行任务。
+"""
+
+include_permissions_instructions = false
+include_apps_instructions = false
+
+[approval]
+mode = "never"
+
+[sandbox]
+mode = "workspace-write"
+network_access = false
+
+[mcp]
+enabled = false
+
+[skills]
+enabled = true
+
+[skills.manage]
+enabled = true
+require_approval = false
+
+[skills.scripts]
+allow_outside_workspace = true
+
+stream = false

@@ -1,0 +1,17 @@
+# AI-workspace 功能点 → agent 路由
+routes:
+  brainstorm:
+    agent_id: brainstorm_agent
+    channel: stable
+  general_qa:
+    agent_id: general_qa_agent
+    channel: stable
+  root_cause_analysis:
+    agent_id: root_cause_analysis_agent
+    channel: stable
+  code_review:
+    agent_id: code_review_agent
+    channel: stable
+  xhs_ops:
+    agent_id: xhs_ops_agent
+    channel: stable

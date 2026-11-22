@@ -1,0 +1,12 @@
+kind: memory
+name: session_only
+version: 1.0.0
+owner: platform-agent-team
+status: released
+description: 仅使用当前会话历史，不写入长期记忆。
+policy: session_only
+history:
+  max_items: 100
+  max_tokens: 24000
+  include_tools: true
+  summarization: disabled

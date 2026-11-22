@@ -1,0 +1,16 @@
+[
+  {
+    "name": "kb-and-web",
+    "prompt": "[知识库检索:开启]\n[联网搜索:开启]\n天气怎么样",
+    "need_kb": true,
+    "need_web": true,
+    "answer_has": "本地回答"
+  },
+  {
+    "name": "neither",
+    "prompt": "[知识库检索:关闭]\n只聊聊笔记",
+    "need_kb": false,
+    "need_web": false,
+    "answer_has": "本地回答"
+  }
+]

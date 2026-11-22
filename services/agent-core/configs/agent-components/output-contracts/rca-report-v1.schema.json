@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://go-agent.local/agent-components/output-contracts/rca-report-v1.schema.json",
+  "title": "RcaReport v1 (model-facing)",
+  "description": "Fields the model must produce. Platform IDs (report_id/job_id/...) are filled later and excluded from required.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "summary",
+    "final_result",
+    "confidence",
+    "root_cause_candidates",
+    "evidence_chain"
+  ],
+  "properties": {
+    "summary": { "type": "string" },
+    "final_result": { "type": "string" },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "root_cause_candidates": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "items": { "type": "object" }
+    },
+    "evidence_chain": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "timeline": { "type": "array" },
+    "verification": { "type": "object" },
+    "missing_evidence": { "type": "array" },
+    "next_steps": { "type": "array" }
+  }
+}

@@ -1,0 +1,227 @@
+# 本地 API 服务专用配置，避免读取 ~/.agentx 里不兼容字段
+provider = "deepseek"
+model = "deepseek-v4-pro"
+model_provider = "deepseek"
+max_tokens = 8192
+temperature = 0.3
+top_p = 0.9
+
+# 系统人设：避免模型自行幻觉成其他 AI 产品身份
+instructions = """
+你是 Go Agent，一个帮助用户理解代码、回答问题、执行开发任务的编程助手。
+不要自称 ChatGPT、Claude 或其他产品名称，除非用户明确询问。
+回答简洁、准确，优先使用中文（除非用户使用其他语言）。
+简单问候、通用问答、定义解释、已知事实总结时直接回答，不要展开长 reasoning、计划或自我检查；只有需要实时数据、工具执行、落盘或复杂排查时才调用工具。
+当用户询问本机 CPU/内存使用率、系统负载时，优先调用 fetch_host_metrics 工具；远程主机指标走 MCP/Prometheus，勿用本机工具冒充。
+当用户要求写小作文、诗歌、散文时，直接在回复中给出全文；需要稳定 JSON 结构的小作文可在 `<structured>` 中输出，勿依赖专用 skill。
+用户要求「生成 md 文档 / 输出 markdown / 保存文档」时：正文必须先完整出现在 `<document title="...">` 内；需要落盘则 apply_patch 写入 GO_AGENT_OUTPUT_DOCUMENTS（见 developer 工作区布局块），禁止 shell echo 写文件；禁止口头声称已保存而未调用 apply_patch。
+"""
+
+# Web 对话场景不需要默认注入 AgentX 风格的权限/Apps 说明
+include_permissions_instructions = false
+include_apps_instructions = false
+
+# 本地开发：允许网络
+sandbox_mode = "read-only"
+
+# 本地开发：trusted workspace 内 shell/MCP 需审批时自动放行（智能运维助手无审批 UI）
+approval_mode = "unless-trusted"
+
+# es_log search_logs 单响应可达 200 KiB，提高 core 侧上限以免二次截断
+tool_result_max_bytes = 204800
+
+[execution_paths]
+# 对齐 Codex：交付物相对 cwd；多智能体默认 outputs/<agent_id>/chat-documents|chat-scripts|scratch
+outputs_prefix = "outputs"
+documents_subdir = "chat-documents"
+scripts_subdir = "chat-scripts"
+scratch_subdir = "scratch"
+per_agent_outputs = true
+# fast_path_enabled = true  # 问候/帮助等简单交互走模板 fast path，跳过 LLM（默认开启）
+
+[sandbox_workspace_write]
+network_access = true
+
+[database]
+# harness runtime_entries：开发默认 sqlite；生产改为 driver = "postgres" 并配置 dsn
+driver = "sqlite"
+# driver = "postgres"
+# dsn = "postgres://aiw:aiw@127.0.0.1:5432/aiw?sslmode=disable"
+
+[state]
+persistence = "enabled"
+flush_on_turn_end = true
+
+[history]
+persistence = "save-all"
+
+[mcp]
+enabled = true
+startup_timeout_ms = 10000
+tool_timeout_ms = 30000
+# es_log 只读工具：精确匹配，禁止通配符
+trusted_tools = [
+  "mcp__es_log__list_log_datasources",
+  "mcp__es_log__test_log_datasource",
+  "mcp__es_log__search_logs",
+  "mcp__metrics__list_panels",
+  "mcp__metrics__query_panel",
+  "mcp__metrics__query_range",
+  "mcp__knowledge__search",
+  "mcp__umodel__catalog_summary",
+  "mcp__umodel__list_datasets",
+  "mcp__umodel__query_metrics",
+  "mcp__umodel__query_logs",
+  "mcp__alerts__alert_summary",
+  "mcp__alerts__list_alerts",
+  "mcp__alerts__get_latest_alert",
+  "mcp__alerts__get_alert_rca",
+  "mcp__systems__resolve_business_system",
+  "mcp__systems__list_business_systems",
+  "mcp__skywalking__list_trace_datasources",
+  "mcp__skywalking__list_slow_traces",
+  "mcp__skywalking__get_trace",
+  "mcp__baseline__list_catalog",
+  "mcp__baseline__query_window",
+  "mcp__baseline__get_scheduled",
+  "mcp__rca_baseline__catalog",
+  "mcp__rca_baseline__query_alert_window",
+  "mcp__rca_baseline__resolve_instance",
+  "mcp__rca_baseline__get_scheduled_baseline",
+  "mcp__rca_grafana__list_panels",
+  "mcp__rca_grafana__query_panel",
+  "mcp__rca_metrics__query_instant",
+  "mcp__rca_metrics__query_range",
+  "mcp__rca_metrics__query_by_layer",
+  "mcp__rca_metrics__suggest_queries",
+  "mcp__rca_elasticsearch__search_logs",
+  "mcp__rca_elasticsearch__cluster_errors",
+  "mcp__rca_skywalking__slow_traces",
+  "mcp__rca_skywalking__db_sql",
+  "mcp__rca_npm__url_errors",
+]
+
+# 业务 HTTP MCP 已迁至 platform-api 注册中心（GO_AGENT_PLATFORM_API_BASE）。
+# 不再内置 [mcp_servers.dev_echo]：`go run` 冷编译可单独吃掉 10s+，拖慢 L2 引导。
+
+[skills]
+enabled = true
+allow_read_scripts = true
+# monorepo 根为 workspace：go-agent-core/skills；若 workspace=go-agent-core 则用 skills/
+# 不加载 kude/skills：酷德审查走独立 runtime
+paths = ["go-agent-core/skills", "skills"]
+
+# 本地联调：真正按绑定过滤（对齐 docker.toml）
+[skills.binding]
+enabled = true
+shadow = false
+fail_open = true
+
+[skills.scripts]
+allow_outside_workspace = true
+
+stream = true
+
+[code_review_backend]
+enabled = false
+url = "http://127.0.0.1:19081"
+secret = "dev-code-review-callback-secret"
+
+[light_path]
+enabled = true
+model = "deepseek-v4-flash"
+max_tokens = 384
+max_history_turns = 2
+max_prompt_chars = 256
+agents = ["general_qa_agent"]
+skip_catalog_on_l2 = true
+
+[light_path.cache]
+enabled = true
+ttl_seconds = 3600
+max_entries = 512
+
+[light_path.embedding]
+enabled = true
+# 从 go-agent-knowledge 内部接口拉取完整嵌入配置（含 API Key），与知识库索引使用同一模型。
+knowledge_url = "http://127.0.0.1:8092/api/knowledge/settings/embedding/internal"
+internal_secret_env = "GO_AGENT_PLATFORM_INTERNAL_SECRET"
+similarity_threshold = 0.72
+
+# 知识库数据源接入（search_knowledge 工具）。PR-2 起工具按 enabled 注册。
+[knowledge]
+enabled = true
+base_url = "http://127.0.0.1:8092"
+timeout_ms = 15000
+internal_secret_env = "GO_AGENT_PLATFORM_INTERNAL_SECRET"
+default_kb_ids = ["kb_default"]
+use_default_when_unselected = true
+default_top_k = 5
+search_mode = "hybrid"
+rerank = true
+graph_timeout_ms = 22000
+
+# M1-5：意图路由灰度（ops-chat 单 agent）；S1 语义 + S2 LLM Router 提供 query_rewrite。
+[intent_router]
+enabled = true
+agents = ["general_qa_agent"]
+
+[intent_router.semantic]
+enabled = true
+timeout_ms = 1500
+
+[intent_router.llm]
+enabled = true
+timeout_ms = 1200
+confidence_threshold = 0.6
+context_turns = 3
+
+[intent_router.llm.cache]
+enabled = true
+ttl_seconds = 3600
+max_entries = 512
+
+# Retrieval-Gate：意图不确定（capability=unknown）时，用一次低成本 top_k=1 探针
+# 检索默认知识库；命中分 >= min_score 则升级为知识检索（强制 search_knowledge）。
+[knowledge.retrieval_gate]
+enabled = true
+min_score = 0.5
+timeout_ms = 800
+top_k = 1
+
+# 本地：Codex 作为默认智能体引擎（官方 sidecar）。二进制不入库，见 deploy/codex-bin/。
+[codex]
+enabled = true
+binary_path = "/Users/sh.zhang/Workspace/xinfu/ai-workspace/go-agent-core/deploy/codex-bin/codex"
+binary_sha256 = "a14f9a907c12c8812878b70e6b7d65f81c39ed795513e46a55817d7428c0ca6b"
+version = "rust-v0.150.1"
+home_root = "/tmp/go-agent-dev/codex-home"
+max_processes = 8
+max_threads_per_process = 1
+acquire_timeout = "15s"
+startup_timeout = "30s"
+request_timeout = "180s"
+
+[codex.isolation]
+workspace_mode = "0700"
+require_mount_namespace = false
+
+[codex.quota]
+max_processes_per_tenant = 4
+
+[codex.model]
+provider = "aiw"
+model = "Qwen3.6-35B-A3B-4bit"
+base_url = "http://127.0.0.1:8001/v1"
+env_key = "AIW_CODEX_MODEL_KEY"
+wire_api = "responses"
+
+[codex.routing]
+default_engine = "codex"
+allow_write_turns = false
+allow_override = true
+
+[codex.approval]
+general_qa = "on-request"
+root_cause_analysis = "never"
+code_review = "never"

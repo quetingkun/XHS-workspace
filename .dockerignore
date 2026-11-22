@@ -1,0 +1,17 @@
+# xhs 镜像 build context=仓库根；排除大目录避免「卡在 build」
+data
+logs
+dist
+.git
+.github
+.cursor
+.pytest_cache
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+services/agent-core
+docs
+tests
+*.md
+.env
+deploy/.env

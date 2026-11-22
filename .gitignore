@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+data/xhs/xhs.sqlite
+data/xhs/xhs.sqlite-*
+data/xhs/media/
+data/xhs/collector-raw/
+data/xhs/browser-profile/
+data/xhs/browser-storage.json
+data/xhs/auth.json
+data/xhs/auth.secret
+data/xhs/knowledge/inbox/pending/*.md
+data/xhs/settings/
+logs/
+%LOCALAPPDATA%/
+services/agent-core/dev/.env.local
+dist/data/xhs/settings/

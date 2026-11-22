@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>小红书运营</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-sans/style.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/geist@1.3.1/dist/fonts/geist-mono/style.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="/app.css?v=50" />
+</head>
+<body class="need-login">
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M12 3l1.6 5.2L19 10l-5.4 1.8L12 17l-1.6-5.2L5 10l5.4-1.8L12 3z" />
+          </svg>
+        </div>
+        <div>
+          <div class="brand-title">小红书运营</div>
+          <div class="brand-sub">Personal Workbench</div>
+        </div>
+      </div>
+      <nav class="nav" id="toc"></nav>
+      <div class="sidebar-foot">
+        <span class="dot"></span>
+        <span>人工确认后发布</span>
+        <button type="button" id="logout-btn" class="sidebar-logout">退出</button>
+      </div>
+    </aside>
+    <main>
+      <div id="view"></div>
+    </main>
+  </div>
+  <div id="login-gate" class="login-gate">
+    <form id="login-form" class="login-card card">
+      <p class="eyebrow">// Sign in</p>
+      <h1>登录运营台</h1>
+      <p class="lede">进入小红书工作台前需要登录。公网部署请在 <code>deploy/.env</code> 设置 <code>XHS_AUTH_PASSWORD</code>。</p>
+      <label>用户名<input name="username" autocomplete="username" required value="admin" /></label>
+      <label>密码<input name="password" type="password" autocomplete="current-password" required /></label>
+      <p id="login-error" class="login-error" role="alert"></p>
+      <button type="submit" class="primary">进入工作台</button>
+      <p class="lede login-hint">若从未设置密码：默认 <code>admin</code> / <code>xhs-admin</code>（见容器启动日志）。改密请删掉 <code>data/xhs/auth.json</code> 后用环境变量重建。</p>
+    </form>
+  </div>
+  <script src="/app.js?v=51"></script>
+</body>
+</html>

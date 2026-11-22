@@ -1,0 +1,84 @@
+# AI-workspace agent-core 容器配置（compose 服务名：knowledge）
+provider = "openai"
+model = "qwen3.6-plus"
+model_provider = "openai"
+api = "openai-chat-completions"
+api_key_env = "OPENAI_API_KEY"
+max_tokens = 8192
+temperature = 0.3
+
+instructions = """
+你是 AI-workspace 个人知识助手，帮助用户整理 Wiki、素材与推演结论。
+优先使用中文。简单问答可直接回复；需要检索知识库时再调用工具。
+"""
+
+include_permissions_instructions = false
+include_apps_instructions = false
+sandbox_mode = "read-only"
+approval_mode = "unless-trusted"
+
+[database]
+driver = "sqlite"
+
+[state]
+persistence = "enabled"
+flush_on_turn_end = true
+
+[history]
+persistence = "save-all"
+
+[mcp]
+enabled = true
+startup_timeout_ms = 10000
+tool_timeout_ms = 60000
+trusted_tools = [
+  "mcp__knowledge__search",
+  "mcp__web_search__search",
+]
+
+# Codex 直连 knowledge 的 HTTP MCP（由 SeedFromConfigMCP 投影）
+[mcp_servers.knowledge]
+transport = "http"
+url = "http://knowledge:8092/api/internal/mcp/knowledge"
+required = true
+
+# 联网搜索（同容器回环；Tavily→百度→Bing）
+[mcp_servers.web_search]
+transport = "http"
+url = "http://127.0.0.1:8081/api/internal/mcp/web_search"
+required = false
+
+[knowledge]
+enabled = true
+base_url = "http://knowledge:8092"
+timeout_ms = 12000
+default_kb_ids = ["kb_default"]
+use_default_when_unselected = true
+default_top_k = 6
+search_mode = "hybrid"
+rerank = true
+
+[skills]
+paths = ["/app/skills"]
+
+[codex]
+# 镜像内已烘焙 /usr/local/bin/codex；digest 与 deploy/codex-bin/codex-linux 对齐
+# （也可由 AIW_CODEX_BINARY_SHA256 / Dockerfile sed BUILD_TIME_CODEX_SHA256 覆盖）
+enabled = true
+binary_path = "/usr/local/bin/codex"
+# deploy/codex-bin/codex-linux @ rust-v0.150.1；换二进制后请重算 sha256
+binary_sha256 = "abf1bb1643a79f73aa78ee627e111e02d4f8c98f25813a0cf6ce277709664386"
+version = "rust-v0.150.1"
+home_root = "/var/lib/ai-workspace/codex-home"
+
+[codex.routing]
+# 产品默认 Codex；设置页可切回 agent-core
+default_engine = "codex"
+allow_override = true
+
+[codex.model]
+# Codex 0.150+ 禁止覆盖内置 provider 名 openai；用自定义 ID
+provider = "openai-compatible"
+wire_api = "responses"
+upstream_api = "openai-chat-completions"
+env_key = "OPENAI_API_KEY"
