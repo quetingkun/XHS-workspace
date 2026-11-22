@@ -57,10 +57,12 @@ def load_images() -> None:
         raise SystemExit("没有镜像包：%s\n请把本机 dist/docker-images/*.tar 一并拷过来。" % IMAGES)
     for tar in tars:
         print("导入 %s（%.0f MB）" % (tar.name, tar.stat().st_size / (1024 * 1024)))
-        cmd = docker_cmd("load")
-        print("+", " ".join(cmd), "<", tar)
-        with tar.open("rb") as src:
-            proc = subprocess.run(cmd, stdin=src)
+        script = "%s < %s" % (
+            " ".join("'" + part.replace("'", "'\"'\"'") + "'" for part in docker_cmd("load")),
+            "'" + str(tar).replace("'", "'\"'\"'") + "'",
+        )
+        print("+", script)
+        proc = subprocess.run(["bash", "-c", script])
         if proc.returncode != 0:
             raise SystemExit(proc.returncode)
 

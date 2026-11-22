@@ -158,6 +158,25 @@ def docker_cmd(*args: str) -> list[str]:
     return cmd
 
 
+def shell_quote(value: str) -> str:
+    return "'" + str(value).replace("'", "'\"'\"'") + "'"
+
+
+def run_redirect(command: list[str], path: Path, *, incoming: bool) -> int:
+    """Linux 上走 shell 重定向：sudo docker save IMAGE > file.tar。"""
+    op = "<" if incoming else ">"
+    if os.name == "nt":
+        log("  $ " + " ".join(command) + " " + op + " " + str(path))
+        mode = "rb" if incoming else "wb"
+        with path.open(mode) as handle:
+            streams = {"stdin": handle} if incoming else {"stdout": handle, "stdin": subprocess.DEVNULL}
+            proc = subprocess.Popen(command, cwd=str(ROOT), **streams)
+            return proc.wait()
+    script = "%s %s %s" % (" ".join(shell_quote(part) for part in command), op, shell_quote(str(path)))
+    log("  $ " + script)
+    return subprocess.call(["bash", "-c", script], cwd=str(ROOT))
+
+
 def compose_cmd() -> list[str]:
     cmd = docker_cmd("compose", "-p", COMPOSE_PROJECT, "-f", str(COMPOSE_FILE))
     if os.environ.get("XHS_DEPLOY_PROD", "").strip() in {"1", "true", "yes"} and COMPOSE_PROD.is_file():
@@ -210,24 +229,11 @@ def image_exists(image: str) -> bool:
 
 
 def docker_save(image: str, tar_name: str) -> None:
-    """把镜像写到 tar。用标准输出，避免 snap 版 Docker 无法在家目录里 -o 建文件。"""
+    """sudo docker save IMAGE > file.tar，由当前用户创建文件。"""
     ensure_image_dir()
     path = tar_path(tar_name)
-    cmd = docker_cmd("save", image)
     log("Saving %s -> %s" % (image, path))
-    log("  $ " + " ".join(cmd) + " > " + str(path))
-    with path.open("wb") as out:
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(ROOT),
-            stdin=subprocess.DEVNULL,
-            stdout=out,
-            stderr=subprocess.PIPE,
-        )
-        err = proc.stderr.read().decode("utf-8", "replace") if proc.stderr else ""
-        code = proc.wait()
-    if err.strip():
-        log(err.rstrip())
+    code = run_redirect(docker_cmd("save", image), path, incoming=False)
     if code != 0 or not path.is_file() or path.stat().st_size == 0:
         path.unlink(missing_ok=True)
         raise SystemExit("docker save 失败: %s" % image)
@@ -235,24 +241,9 @@ def docker_save(image: str, tar_name: str) -> None:
 
 
 def docker_load_file(path: Path) -> None:
-    cmd = docker_cmd("load")
     log("Loading %s" % path)
-    log("  $ " + " ".join(cmd) + " < " + str(path))
-    with path.open("rb") as src:
-        proc = subprocess.Popen(
-            cmd,
-            cwd=str(ROOT),
-            stdin=src,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-        out, _ = proc.communicate()
-    if out.strip():
-        log(out.rstrip())
-    if proc.returncode != 0:
+    code = run_redirect(docker_cmd("load"), path, incoming=True)
+    if code != 0:
         raise SystemExit("docker load 失败: %s" % path)
 
 
