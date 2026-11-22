@@ -386,7 +386,8 @@ def build_service(name: str) -> None:
     elif name == "agent-core":
         log("  （agent-core 含大体积 codex COPY，首次可能 5–15 分钟）")
     build_cmd = compose_cmd()
-    build_cmd[2:2] = ["--progress", "plain"]
+    compose_at = build_cmd.index("compose") + 1
+    build_cmd[compose_at:compose_at] = ["--progress", "plain"]
     run(build_cmd + ["build", meta["service"]], stream=True)
     if not image_exists(meta["image"]):
         raise SystemExit("构建完成但镜像不存在: %s" % meta["image"])
