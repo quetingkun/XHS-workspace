@@ -16,7 +16,11 @@ error() { echo "[codex-bin] ERROR: $*" >&2; }
 detect_target() {
   local arch=""
   if command -v docker >/dev/null 2>&1; then
-    arch="$(docker info --format '{{.Architecture}}' 2>/dev/null || true)"
+    if [[ "$(id -u)" -eq 0 ]]; then
+      arch="$(docker info --format '{{.Architecture}}' 2>/dev/null || true)"
+    else
+      arch="$(sudo docker info --format '{{.Architecture}}' 2>/dev/null || true)"
+    fi
   fi
   if [[ -z "$arch" ]]; then
     arch="$(uname -m)"

@@ -150,8 +150,16 @@ def run_ok(cmd: list[str], *, quiet: bool = True) -> bool:
 COMPOSE_PROD = ROOT / "deploy" / "docker-compose.prod.yml"
 
 
+def docker_cmd(*args: str) -> list[str]:
+    """Ubuntu 上的 Docker 套接字需要 root。Windows 和已经是 root 的进程不加 sudo。"""
+    cmd = ["docker", *args]
+    if os.name != "nt" and getattr(os, "geteuid", lambda: 0)() != 0:
+        return ["sudo", *cmd]
+    return cmd
+
+
 def compose_cmd() -> list[str]:
-    cmd = ["docker", "compose", "-p", COMPOSE_PROJECT, "-f", str(COMPOSE_FILE)]
+    cmd = docker_cmd("compose", "-p", COMPOSE_PROJECT, "-f", str(COMPOSE_FILE))
     if os.environ.get("XHS_DEPLOY_PROD", "").strip() in {"1", "true", "yes"} and COMPOSE_PROD.is_file():
         cmd += ["-f", str(COMPOSE_PROD)]
     if ENV_FILE.is_file():
@@ -160,7 +168,7 @@ def compose_cmd() -> list[str]:
 
 
 def docker_info_ok() -> bool:
-    return run_ok(["docker", "info"])
+    return run_ok(docker_cmd("info"))
 
 
 def ensure_docker_desktop() -> None:
@@ -198,14 +206,14 @@ def tar_path(name: str) -> Path:
 
 
 def image_exists(image: str) -> bool:
-    return run_ok(["docker", "image", "inspect", image])
+    return run_ok(docker_cmd("image", "inspect", image))
 
 
 def docker_save(image: str, tar_name: str) -> None:
     ensure_image_dir()
     path = tar_path(tar_name)
     log("Saving %s -> %s" % (image, path))
-    code, _ = run(["docker", "save", "-o", str(path), image], check=False)
+    code, _ = run(docker_cmd("save", "-o", str(path), image), check=False)
     if code != 0:
         raise SystemExit("docker save 失败: %s" % image)
     if path.is_file():
@@ -214,7 +222,7 @@ def docker_save(image: str, tar_name: str) -> None:
 
 def docker_load_file(path: Path) -> None:
     log("Loading %s" % path)
-    run(["docker", "load", "-i", str(path)])
+    run(docker_cmd("load", "-i", str(path)))
 
 
 def load_packed_images() -> None:
@@ -366,7 +374,7 @@ def print_access_summary(services: list[str]) -> None:
         log("  %-14s %s" % (meta["title"], _service_open_url(name)))
         log("             %s" % meta["note"])
     log("")
-    log("  状态: docker compose -p %s -f deploy/docker-compose.yml ps" % COMPOSE_PROJECT)
+    log("  状态: %s" % " ".join(compose_cmd() + ["ps"]))
 
 
 def build_service(name: str) -> None:
@@ -602,9 +610,8 @@ def start_services(services: list[str], *, kill_host_ports: bool = True) -> None
     ok, failed = wait_services_ready(services, timeout_sec=150)
     if not ok:
         raise SystemExit(
-            "部分服务未就绪: %s\n"
-            "检查: docker compose -p %s -f deploy/docker-compose.yml ps"
-            % (", ".join(failed), COMPOSE_PROJECT)
+            "部分服务未就绪: %s\n检查: %s"
+            % (", ".join(failed), " ".join(compose_cmd() + ["ps"]))
         )
     print_access_summary(services)
     log("Done.")

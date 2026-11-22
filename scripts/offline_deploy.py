@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
@@ -31,13 +32,20 @@ def run(cmd: list[str], *, check: bool = True) -> int:
     return proc.returncode
 
 
+def docker_cmd(*args: str) -> list[str]:
+    cmd = ["docker", *args]
+    if os.name != "nt" and getattr(os, "geteuid", lambda: 0)() != 0:
+        return ["sudo", *cmd]
+    return cmd
+
+
 def compose_base() -> list[str]:
     if shutil.which("docker") is None:
         raise SystemExit("未找到 docker。请先安装 Docker。")
-    probe = subprocess.run(["docker", "compose", "version"], capture_output=True)
+    probe = subprocess.run(docker_cmd("compose", "version"), capture_output=True)
     if probe.returncode != 0:
         raise SystemExit("未找到 docker compose。")
-    cmd = ["docker", "compose", "-p", "xhs-workspace", "-f", str(COMPOSE)]
+    cmd = docker_cmd("compose", "-p", "xhs-workspace", "-f", str(COMPOSE))
     if ENV_FILE.is_file():
         cmd += ["--env-file", str(ENV_FILE)]
     return cmd
@@ -49,7 +57,7 @@ def load_images() -> None:
         raise SystemExit("没有镜像包：%s\n请把本机 dist/docker-images/*.tar 一并拷过来。" % IMAGES)
     for tar in tars:
         print("导入 %s（%.0f MB）" % (tar.name, tar.stat().st_size / (1024 * 1024)))
-        run(["docker", "load", "-i", str(tar)])
+        run(docker_cmd("load", "-i", str(tar)))
 
 
 def stop_nginx() -> None:
