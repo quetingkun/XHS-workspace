@@ -7,7 +7,7 @@ collectors:
     default_keyword: ""
     command: ""
     top_n: 15
-    timeout: 120
+    timeout: 240
     # Docker 无本机 Chrome，无头时会自动用 Playwright Chromium
     browser_channel: chrome
     user_data_dir: data/xhs/browser-profile

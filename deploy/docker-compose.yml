@@ -20,6 +20,7 @@ services:
     pull_policy: build
     container_name: xhs-workspace-xhs
     restart: unless-stopped
+    shm_size: "1gb"
     ports:
       - "8097:8097"
     environment:

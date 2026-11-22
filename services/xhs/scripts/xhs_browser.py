@@ -91,6 +91,8 @@ def context_kwargs(*, headed: bool, channel: str | None) -> dict:
     args = list(STEALTH_ARGS)
     if not headed:
         args.append("--headless=new")
+    if running_in_docker():
+        args.extend(["--disable-dev-shm-usage", "--no-sandbox", "--disable-gpu"])
     if ignore_https_errors():
         args.extend(
             [
