@@ -210,19 +210,50 @@ def image_exists(image: str) -> bool:
 
 
 def docker_save(image: str, tar_name: str) -> None:
+    """把镜像写到 tar。用标准输出，避免 snap 版 Docker 无法在家目录里 -o 建文件。"""
     ensure_image_dir()
     path = tar_path(tar_name)
+    cmd = docker_cmd("save", image)
     log("Saving %s -> %s" % (image, path))
-    code, _ = run(docker_cmd("save", "-o", str(path), image), check=False)
-    if code != 0:
+    log("  $ " + " ".join(cmd) + " > " + str(path))
+    with path.open("wb") as out:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(ROOT),
+            stdin=subprocess.DEVNULL,
+            stdout=out,
+            stderr=subprocess.PIPE,
+        )
+        err = proc.stderr.read().decode("utf-8", "replace") if proc.stderr else ""
+        code = proc.wait()
+    if err.strip():
+        log(err.rstrip())
+    if code != 0 or not path.is_file() or path.stat().st_size == 0:
+        path.unlink(missing_ok=True)
         raise SystemExit("docker save 失败: %s" % image)
-    if path.is_file():
-        log("  wrote %.1f MB" % (path.stat().st_size / (1024.0 * 1024.0)))
+    log("  wrote %.1f MB" % (path.stat().st_size / (1024.0 * 1024.0)))
 
 
 def docker_load_file(path: Path) -> None:
+    cmd = docker_cmd("load")
     log("Loading %s" % path)
-    run(docker_cmd("load", "-i", str(path)))
+    log("  $ " + " ".join(cmd) + " < " + str(path))
+    with path.open("rb") as src:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=str(ROOT),
+            stdin=src,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        out, _ = proc.communicate()
+    if out.strip():
+        log(out.rstrip())
+    if proc.returncode != 0:
+        raise SystemExit("docker load 失败: %s" % path)
 
 
 def load_packed_images() -> None:
